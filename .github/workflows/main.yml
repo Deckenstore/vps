@@ -1,0 +1,50 @@
+name: Permanent Free VPS
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"   # auto restart every 30 min
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+
+    steps:
+      - name: Start VPS
+        run: |
+          echo "Updating system..."
+          sudo apt update -y
+          sudo apt install -y openssh-server screen wget unzip
+
+          echo "Setting up SSH..."
+          sudo systemctl enable ssh
+          sudo systemctl restart ssh
+          sudo mkdir -p /run/sshd
+
+          echo "Setting root password..."
+          echo 'root:123456' | sudo chpasswd
+
+          echo "Allowing root SSH login..."
+          sudo sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+          sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          sudo systemctl restart ssh
+
+      - name: Setup Cloudflare Tunnel (Permanent Link)
+        run: |
+          echo "Downloading Cloudflare..."
+          wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod +x cloudflared-linux-amd64
+
+          echo "Starting Tunnel..."
+          ./cloudflared-linux-amd64 tunnel --url ssh://localhost:22 > tunnel.log 2>&1 &
+
+          sleep 10
+          echo "========== SSH PUBLIC LINK BELOW =========="
+          grep -o 'https://.*trycloudflare.com' tunnel.log
+          echo "==========================================="
+
+      - name: Keep VPS Alive
+        run: |
+          echo "VPS is running..."
+          sleep 21600  # 6 hours (GitHub max)
