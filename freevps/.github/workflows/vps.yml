@@ -3,7 +3,7 @@ name: Permanent Free VPS
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/30 * * * *"   # auto restart every 30 min
+    - cron: "*/30 * * * *"
 
 jobs:
   build:
@@ -15,20 +15,12 @@ jobs:
         run: |
           echo "Updating system..."
           sudo apt update -y
-          sudo apt install -y openssh-server screen wget unzip
+          sudo apt install -y shellinabox wget unzip
 
-          echo "Setting up SSH..."
-          sudo systemctl enable ssh
-          sudo systemctl restart ssh
-          sudo mkdir -p /run/sshd
-
-          echo "Setting root password..."
-          echo 'root:123456' | sudo chpasswd
-
-          echo "Allowing root SSH login..."
-          sudo sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
-          sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
-          sudo systemctl restart ssh
+          echo "Starting Web Terminal on port 7681..."
+          sudo systemctl enable shellinabox
+          sudo sed -i 's/--no-beep/--no-beep --disable-ssl/' /etc/default/shellinabox
+          sudo systemctl restart shellinabox
 
       - name: Setup Cloudflare Tunnel (Permanent Link)
         run: |
@@ -37,14 +29,14 @@ jobs:
           chmod +x cloudflared-linux-amd64
 
           echo "Starting Tunnel..."
-          ./cloudflared-linux-amd64 tunnel --url ssh://localhost:22 > tunnel.log 2>&1 &
+          ./cloudflared-linux-amd64 tunnel --url http://localhost:7681 > tunnel.log 2>&1 &
 
           sleep 10
-          echo "========== SSH PUBLIC LINK BELOW =========="
+          echo "========== WEB TERMINAL LINK BELOW =========="
           grep -o 'https://.*trycloudflare.com' tunnel.log
-          echo "==========================================="
+          echo "============================================="
 
       - name: Keep VPS Alive
         run: |
-          echo "VPS is running..."
-          sleep 21600  # 6 hours (GitHub max)
+          echo "VPS Running..."
+          sleep 21600
